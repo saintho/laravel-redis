@@ -1,5 +1,5 @@
 {
-    "name": "saint/redis",
+    "name": "saint/laravel-redis",
     "description": "The Laravel Redis package.",
     "license": "MIT",
     "homepage": "http://meijiabang.com",
