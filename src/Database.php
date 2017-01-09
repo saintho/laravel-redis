@@ -1,14 +1,17 @@
 <?php
 
-namespace Saint\Redis;
+namespace Saint\LaravelRedis;
 
 use Closure;
+use Illuminate\Events\Dispatcher;
 use Predis\Client;
 use Illuminate\Support\Arr;
 use Illuminate\Contracts\Redis\Database as DatabaseContract;
 
 class Database implements DatabaseContract
 {
+    protected static $events;
+
     /**
      * The host address of the database.
      *
@@ -19,14 +22,14 @@ class Database implements DatabaseContract
     /**
      * Create a new Redis connection instance.
      *
-     * @param  array  $servers
+     * @param  array $servers
      * @return void
      */
     public function __construct(array $servers = [])
     {
         $cluster = Arr::pull($servers, 'cluster');
 
-        $options = (array) Arr::pull($servers, 'options');
+        $options = (array)Arr::pull($servers, 'options');
 
         if ($cluster) {
             $this->clients = $this->createAggregateClient($servers, $options);
@@ -38,8 +41,8 @@ class Database implements DatabaseContract
     /**
      * Create a new aggregate client supporting sharding.
      *
-     * @param  array  $servers
-     * @param  array  $options
+     * @param  array $servers
+     * @param  array $options
      * @return array
      */
     protected function createAggregateClient(array $servers, array $options = [])
@@ -50,8 +53,8 @@ class Database implements DatabaseContract
     /**
      * Create an array of single connection clients.
      *
-     * @param  array  $servers
-     * @param  array  $options
+     * @param  array $servers
+     * @param  array $options
      * @return array
      */
     protected function createSingleClients(array $servers, array $options = [])
@@ -68,7 +71,7 @@ class Database implements DatabaseContract
     /**
      * Get a specific Redis connection instance.
      *
-     * @param  string  $name
+     * @param  string $name
      * @return \Predis\ClientInterface|null
      */
     public function connection($name = 'default')
@@ -79,8 +82,8 @@ class Database implements DatabaseContract
     /**
      * Run a command against the Redis database.
      *
-     * @param  string  $method
-     * @param  array   $parameters
+     * @param  string $method
+     * @param  array $parameters
      * @return mixed
      */
     public function command($method, array $parameters = [])
@@ -91,17 +94,17 @@ class Database implements DatabaseContract
     /**
      * Subscribe to a set of given channels for messages.
      *
-     * @param  array|string  $channels
-     * @param  \Closure  $callback
-     * @param  string  $connection
-     * @param  string  $method
+     * @param  array|string $channels
+     * @param  \Closure $callback
+     * @param  string $connection
+     * @param  string $method
      * @return void
      */
     public function subscribe($channels, Closure $callback, $connection = null, $method = 'subscribe')
     {
         $loop = $this->connection($connection)->pubSubLoop();
 
-        call_user_func_array([$loop, $method], (array) $channels);
+        call_user_func_array([$loop, $method], (array)$channels);
 
         foreach ($loop as $message) {
             if ($message->kind === 'message' || $message->kind === 'pmessage') {
@@ -115,9 +118,9 @@ class Database implements DatabaseContract
     /**
      * Subscribe to a set of given channels with wildcards.
      *
-     * @param  array|string  $channels
-     * @param  \Closure  $callback
-     * @param  string  $connection
+     * @param  array|string $channels
+     * @param  \Closure $callback
+     * @param  string $connection
      * @return void
      */
     public function psubscribe($channels, Closure $callback, $connection = null)
@@ -128,12 +131,24 @@ class Database implements DatabaseContract
     /**
      * Dynamically make a Redis command.
      *
-     * @param  string  $method
-     * @param  array   $parameters
+     * @param  string $method
+     * @param  array $parameters
      * @return mixed
      */
     public function __call($method, $parameters)
     {
-        return $this->command($method, $parameters);
+        $res = $this->command($method, $parameters);
+
+        self::$events->fire(new Event\Event($method, $parameters, $res));
+
+        return $res;
     }
+
+
+    public static function setEventDispatcher(Dispatcher $events)
+    {
+        self::$events = $events;
+    }
+
+
 }

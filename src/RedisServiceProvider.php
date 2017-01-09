@@ -1,6 +1,6 @@
 <?php
 
-namespace Saint\Redis;
+namespace Saint\LaravelRedis;
 
 use Illuminate\Support\ServiceProvider;
 
@@ -20,6 +20,11 @@ class RedisServiceProvider extends ServiceProvider
      */
     public function register()
     {
+        /**
+         * set event dispatcher
+         */
+        Database::setEventDispatcher($this->app['Illuminate\Contracts\Events\Dispatcher']);
+
         $this->app->singleton('redis', function ($app) {
             return new Database($app['config']['database.redis']);
         });
